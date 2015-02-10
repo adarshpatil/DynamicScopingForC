@@ -34,10 +34,56 @@ How to run this code
     *  LLVM_BUILD_PATH := $$HOME/llvm/build <br/> This points to the built directory of LLVM where make was run
     *  LLVM_BIN_PATH := $(LLVM_BUILD_PATH)/Release+Asserts/bin/  <br/> This points to the location of the binary of clang within the build directory
 
+- Once you make the modifications you can run make and make test to test the build.
+
+Features
+----
+Can handle the following declarations
+- Multiple declarations in a line with initializations, example:
+```
+int a = 20,b;
+OR
+int a = (10*20+30); //complex expression
+```
+- Multiple (and repeated) undeclared variables in a single expression or statement, example:
+```
+a = b + c; (where a,b and c are undeclared in current scope)
+OR
+a = a * b; 
+````
+- Global variables (can be declared anywhere in global scope) and local variables with same name but different type in different scopes, examples:
+```
+int a;
+//statements
+void f()
+{
+    float a = 2.5;
+    //statements
+}
+void f1()
+{
+		int a = 30;
+		//statements
+		if(<condition)
+		{
+			char a;
+			//statements
+		}
+}
+``` 
+- Can detect errors if variables that have never been declared anywhere in the program are used
+
+TO FIX
+----
+- We place our dynamic stuct type all the way on top and if suppose a type struct is defined later we will get an error!!
+- Fix int a,b; in local variable declaration because of replacetext visitVarDecl()
+- Use tracker function to find the next backup variable name for local vars
+
+
 License
 ----
 
-Lesser General Public License (LGPL) Licence
+MIT
 
 **Free Software, Hell Yeah!**
 
