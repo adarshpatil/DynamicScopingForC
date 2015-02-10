@@ -124,24 +124,27 @@ public:
 	
 	// get components as string for given basis
 	std::string getComponents(int num, std::string basis) {
-		int i = 0;
+		int i = basis.length()-1;
 		std::string components="";
 		std::string rcomponents="";
+		
 		while( num < basis[i] ) {
 			components += std::to_string(num % (basis[i]-'0'));
 			num = num / (basis[i] - '0');
-			i++;
+			i--;
 		}
-		if ( i<basis.length() )
-			while(i<basis.length()) {
+		if ( i>=0 )
+			while(i!=0) {
 				components += "0";
-				i++;
+				i--;
 			}
+			
+		components+="\0";
 		
 		for (std::string::reverse_iterator rit=components.rbegin(); rit!=components.rend(); ++rit)
 			rcomponents += *rit;
-			
-		llvm::errs() << "COMPOENTS" << rcomponents << "\n";
+		
+		return rcomponents;
 	}
 	
 	// get Initialized value
@@ -404,6 +407,13 @@ public:
 		Visitor.addGlobalDecl();
 	}
 
+	void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+		size_t start_pos = 0;
+		while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+			str.replace(start_pos, from.length(), to);
+			start_pos += to.length();
+		}
+	}
 	
 	void renameUndefinedButUsed() {
 		
@@ -463,19 +473,25 @@ public:
 				
 				for ( int i = 0;i < combinations;i++) {
 					components = Visitor.getComponents(i,basis);
-					for ( int j = 0;i<parsedVar.size();j++) {
-						replacedString =parsedVar[i] + ".du." +
-										Visitor.allVarNames[Visitor.getIndexOfVarName(parsedVar[i])].types
+					llvm::errs() << basis << " " << components << " " << parsedVar.size() << "\n";
+					errorLineOrg.assign(errorLine);
+					SS << "if (" ;
+					for ( int j = 0;j<parsedVar.size();j++) {
+						replacedString =parsedVar[j] + ".du." +
+										Visitor.allVarNames[Visitor.getIndexOfVarName(parsedVar[j])].types
 											[components[j]-'0'] + "val";
 						
-						errorLineOrg.assign(errorLine);			
+						
+						replaceAll(errorLine, parsedVar[j], replacedString);
 						//std::replace(errorLine.begin(), errorLine.end(), parsedVar[i], replacedString );
 						
-						SS 	<< "if (" << (I+i)->first.getAsString() << ".type==" << components[j] << ") {"
-							<< errorLine;
-						errorLine.assign(errorLineOrg);
+						SS 	<< parsedVar[j] << ".type==" << components[j]; 
+						if((j+1) < parsedVar.size())
+							SS << " && ";
 						
 					}
+					SS << ")" << errorLine << ";\n";
+					errorLine.assign(errorLineOrg);
 				}
 				
 				
@@ -553,7 +569,7 @@ int main(int argc, char *argv[]) {
 	//TheConsumer.showVarNames();
 	
 	TheConsumer.addGlobalVarDecl();
-	//TheConsumer.renameUndefinedButUsed();
+	TheConsumer.renameUndefinedButUsed();
 	
 	// At this point the rewriter's buffer should be full with the rewritten
 	// file contents.

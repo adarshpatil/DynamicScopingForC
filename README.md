@@ -72,6 +72,8 @@ void f1()
 }
 ``` 
 - Can detect errors if variables that have never been declared anywhere in the program are used
+- Can convert statemnts which have a combination of DeclRef variables and undeclaredButUsed variables
+
 
 TO FIX
 ----
