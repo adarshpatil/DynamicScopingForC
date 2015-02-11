@@ -25,7 +25,7 @@
 
 using namespace clang;
 
-
+class ChainedConsumer;
 // By implementing RecursiveASTVisitor, we can specify which AST nodes
 // we're interested in by overriding relevant methods.
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
@@ -45,10 +45,14 @@ private:
 	std::vector<allVars> allVarNames;
 	unsigned int globalDeclLoc;
 	unsigned int globalInitLoc;
+	std::vector<std::pair<std::string, SourceLocation>> visitedDeclRef;
 	
 public:
 	MyASTVisitor(Rewriter &R) : TheRewriter(R) {}
-
+	
+	// Map from SourceLocation to rewriter stringstream
+	std::map<SourceLocation, std::string> rewriterDeclRef;
+	
 	// Override VisitDeclRefExpr - called when a declared variable is referenced
 	bool VisitDeclRefExpr(const DeclRefExpr *node) {
 		std::stringstream SS;
@@ -57,12 +61,102 @@ public:
 		if ( isa<VarDecl>(node->getDecl()) ) {
 			SourceLocation drLoc = node->getLocation();
 			name = node->getNameInfo().getName().getAsString();
+			
+			std::string declrefLine;
+			int forwardLocToEnd,back;
+			std::vector<std::string> parsedVar;
+			std::stringstream SS;
+			
 			llvm::errs()<< "DECL REF " << name << " " << drLoc.getRawEncoding() << "\n";
-			//SS << "if(" << name << ".tag==1){" << name ".i";
+			forwardLocToEnd = getCompleteLine(declrefLine,drLoc.getRawEncoding());
+			back = declrefLine.length()-forwardLocToEnd;
+			
+			llvm::errs()<< "DECL REF LINE: " << declrefLine << "\n";
+			
+			// check if we encountered DeclRefExpr earlier in this line
+			// return if this was already processed
+			for (std::vector<std::pair<std::string, SourceLocation>>::iterator
+					I = visitedDeclRef.begin(), E = visitedDeclRef.end();
+					I != E;I++) {
+				if ( drLoc.getRawEncoding()-back < I->second.getRawEncoding() ) {
+					// get only unique names i.e a=a+b gives only a,b
+					if ( strcmp(name.c_str(),I->first.c_str()) == 0)
+						return true;
+					parsedVar.push_back(I->first);
+				}
+			}
+			
+			
+			// push into vector as this is encountered first time
+			visitedDeclRef.push_back(std::make_pair(name, drLoc));
+			parsedVar.push_back(name);
+			
+			llvm::errs() << "Unique LENGTH: " << parsedVar.size() << "\n";
+			
+			
+			// check if there is a undeclaredButUsed variable in this line
+			//if( ChainedConsumer::mSema ) {
+			//	llvm::errs() << "YES WE CAN\n";
+			//}
+			// replace variable names and generate if-else ladder
+			
+				
+			int combinations = 1;
+			std::string basis = "";
+			std::string components;
+			std::string replacedString;
+			std::string declrefLineOrg;
+				
+			for( int i = 0;i< parsedVar.size();i++) {
+				combinations *= allVarNames[getIndexOfVarName(parsedVar[i])].num_types;
+				basis += std::to_string(allVarNames[getIndexOfVarName(parsedVar[i])].num_types);
+			}
+				
+				
+			llvm::errs() << "COMBINATIONS: " << combinations << "\n";
+				
+				
+				
+			for ( int i = 0;i < combinations;i++) {
+				components = getComponents(i,basis);
+				llvm::errs() << basis << " " << components << " " << parsedVar.size() << "\n";
+				declrefLineOrg.assign(declrefLine);
+				SS << "if (" ;
+				for ( int j = 0;j<parsedVar.size();j++) {
+					replacedString =parsedVar[j] + ".du." +
+									allVarNames[getIndexOfVarName(parsedVar[j])].types
+										[components[j]-'0'] + "val";
+						
+						
+					replaceAll(declrefLine, parsedVar[j], replacedString);
+						
+					SS 	<< parsedVar[j] << ".type==" << components[j]; 
+					if((j+1) < parsedVar.size())
+						SS << " && ";
+						
+				}
+				SS << ")" << declrefLine << ";\n";
+				declrefLine.assign(declrefLineOrg);
+			}
+				
+			
+			rewriterDeclRef[ SourceLocation::getFromRawEncoding( drLoc.getRawEncoding()-back+1 ) ] = SS.str();
+			//unsigned int beginLoc = drLoc.getRawEncoding();
+			//beginLoc = beginLoc - (declrefLine.length() - forwardLocToEnd);
+			//TheRewriter.ReplaceText(SourceLocation::getFromRawEncoding(beginLoc), declrefLine.length()+1, SS.str());
+			
 		}
 		return true;
 	}
-  
+
+	void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+		size_t start_pos = 0;
+		while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+			str.replace(start_pos, from.length(), to);
+			start_pos += to.length();
+		}
+	}
+	
 	// Returns true if the Variable name is present in our allVars Vector
 	bool isNewVarName( std::string v ) {
 		for( std::vector<allVars>::iterator it = allVarNames.begin(); it != allVarNames.end(); ++it){
@@ -375,6 +469,7 @@ public:
 // Implementation of the ASTConsumer interface for reading an AST produced
 // by the Clang parser.
 class ChainedConsumer : public SemaConsumer {
+
 public:
 	ChainedConsumer(Rewriter &R) : Visitor(R) { }
 
@@ -406,16 +501,20 @@ public:
 	void addGlobalVarDecl(){
 		Visitor.addGlobalDecl();
 	}
-
-	void replaceAll(std::string& str, const std::string& from, const std::string& to) {
-		size_t start_pos = 0;
-		while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-			str.replace(start_pos, from.length(), to);
-			start_pos += to.length();
-		}
-	}
 	
+	
+	// Rename the undefined variables to corresponding dynamic structs
 	void renameUndefinedButUsed() {
+		
+		// rewrite VisitVarDecl strings into buffer
+		for( std::map<SourceLocation, std::string>::iterator
+				I = Visitor.rewriterDeclRef.begin(), E = Visitor.rewriterDeclRef.end();
+				I != E; I++) {
+					std::string line;
+					Visitor.getCompleteLine(line,I->first.getRawEncoding());
+					Visitor.TheRewriter.ReplaceText(I->first, line.length()+1 , I->second);
+					llvm::errs() << "SL: " << I->first.getRawEncoding() << " " << I->second << "\n";
+		}
 		
 		for (std::vector<std::pair<DeclarationName, SourceLocation>>::iterator
 				I = mSema->UndeclaredButUsed.begin(), E = mSema->UndeclaredButUsed.end();
@@ -482,7 +581,7 @@ public:
 											[components[j]-'0'] + "val";
 						
 						
-						replaceAll(errorLine, parsedVar[j], replacedString);
+						Visitor.replaceAll(errorLine, parsedVar[j], replacedString);
 						//std::replace(errorLine.begin(), errorLine.end(), parsedVar[i], replacedString );
 						
 						SS 	<< parsedVar[j] << ".type==" << components[j]; 
@@ -500,17 +599,19 @@ public:
 				beginLoc = beginLoc - (errorLine.length() - forwardLocToEnd);
 				Visitor.TheRewriter.ReplaceText(SourceLocation::getFromRawEncoding(beginLoc), errorLine.length()+1, SS.str());
 				
-				// Skip distinctVarCtr iterations ahead
+				// Skip VarCtr iterations ahead
 				I = I + varCtr;
 				
 			} 
 		}
 	}
 	
+	static Sema* mSema;
+	
 private:
 	MyASTVisitor Visitor;
 	int first_visit_flag = 0;
-	Sema* mSema;
+	
 };
 
 

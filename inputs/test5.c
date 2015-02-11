@@ -1,5 +1,9 @@
+int a=10;
 int main()
 {
-	int a,b=10;
+	float b=1.5;
+	a=b+a;
+	a = 20;
+	return a;
 }
 

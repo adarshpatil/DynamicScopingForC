@@ -80,7 +80,8 @@ TO FIX
 - We place our dynamic stuct type all the way on top and if suppose a type struct is defined later we will get an error!!
 - Fix int a,b; in local variable declaration because of replacetext visitVarDecl()
 - Use tracker function to find the next backup variable name for local vars
-
+- including stdio.h gives error
+- Remove ; from global variable declarations
 
 License
 ----
