@@ -22,10 +22,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/SemaConsumer.h"
 #include "clang/Sema/Sema.h"
-
+#define DEBUG 1
+#define dbg(...) if(DEBUG != 0) { \
+	llvm::errs() << __VA_ARGS__; }
 using namespace clang;
 
-class ChainedConsumer;
+Sema *globalSema;
+
 // By implementing RecursiveASTVisitor, we can specify which AST nodes
 // we're interested in by overriding relevant methods.
 class MyASTVisitor : public RecursiveASTVisitor<MyASTVisitor> {
@@ -67,11 +70,11 @@ public:
 			std::vector<std::string> parsedVar;
 			std::stringstream SS;
 			
-			llvm::errs()<< "DECL REF " << name << " " << drLoc.getRawEncoding() << "\n";
+			dbg( "DECL REF " << name << " " << drLoc.getRawEncoding() << "\n");
 			forwardLocToEnd = getCompleteLine(declrefLine,drLoc.getRawEncoding());
 			back = declrefLine.length()-forwardLocToEnd;
 			
-			llvm::errs()<< "DECL REF LINE: " << declrefLine << "\n";
+			dbg("DECL REF LINE: " << declrefLine << "\n");
 			
 			// check if we encountered DeclRefExpr earlier in this line
 			// return if this was already processed
@@ -91,13 +94,13 @@ public:
 			visitedDeclRef.push_back(std::make_pair(name, drLoc));
 			parsedVar.push_back(name);
 			
-			llvm::errs() << "Unique LENGTH: " << parsedVar.size() << "\n";
+			dbg("Unique LENGTH: " << parsedVar.size() << "\n");
 			
 			
 			// check if there is a undeclaredButUsed variable in this line
-			//if( ChainedConsumer::mSema ) {
-			//	llvm::errs() << "YES WE CAN\n";
-			//}
+			if( globalSema ) {
+				dbg("YES WE CAN\n");
+			}
 			// replace variable names and generate if-else ladder
 			
 				
@@ -113,13 +116,13 @@ public:
 			}
 				
 				
-			llvm::errs() << "COMBINATIONS: " << combinations << "\n";
+			dbg( "COMBINATIONS: " << combinations << "\n");
 				
 				
 				
 			for ( int i = 0;i < combinations;i++) {
 				components = getComponents(i,basis);
-				llvm::errs() << basis << " " << components << " " << parsedVar.size() << "\n";
+				dbg( basis << " " << components << " " << parsedVar.size() << "\n");
 				declrefLineOrg.assign(declrefLine);
 				SS << "if (" ;
 				for ( int j = 0;j<parsedVar.size();j++) {
@@ -141,9 +144,7 @@ public:
 				
 			
 			rewriterDeclRef[ SourceLocation::getFromRawEncoding( drLoc.getRawEncoding()-back+1 ) ] = SS.str();
-			//unsigned int beginLoc = drLoc.getRawEncoding();
-			//beginLoc = beginLoc - (declrefLine.length() - forwardLocToEnd);
-			//TheRewriter.ReplaceText(SourceLocation::getFromRawEncoding(beginLoc), declrefLine.length()+1, SS.str());
+			
 			
 		}
 		return true;
@@ -513,16 +514,16 @@ public:
 					std::string line;
 					Visitor.getCompleteLine(line,I->first.getRawEncoding());
 					Visitor.TheRewriter.ReplaceText(I->first, line.length()+1 , I->second);
-					llvm::errs() << "SL: " << I->first.getRawEncoding() << " " << I->second << "\n";
+					dbg( "SL: " << I->first.getRawEncoding() << " " << I->second << "\n");
 		}
 		
 		for (std::vector<std::pair<DeclarationName, SourceLocation>>::iterator
 				I = mSema->UndeclaredButUsed.begin(), E = mSema->UndeclaredButUsed.end();
 				I != E;) {
-			llvm::errs() << "UNDEFINED BUT USED " << I->first.getAsString() << " " << I->second.getRawEncoding() << "\n";
+			dbg( "UNDEFINED BUT USED " << I->first.getAsString() << " " << I->second.getRawEncoding() << "\n");
 			if ( Visitor.isNewVarName(I->first.getAsString()) ) {
-				llvm::errs() << "ERROR: UNDEFINED IDENTIFIER " << I->first.getAsString() << " AT LOC " 
-							<< I->second.getRawEncoding() <<"\n";
+				dbg( "ERROR: UNDEFINED IDENTIFIER " << I->first.getAsString() << " AT LOC " 
+							<< I->second.getRawEncoding() <<"\n");
 				I++;
 			}
 			else {
@@ -531,7 +532,7 @@ public:
 				int forwardLocToEnd = Visitor.getCompleteLine(errorLine, I->second.getRawEncoding());
 				int varCtr = 1;
 				
-				llvm::errs()<< "LINE :" << errorLine << " FOWARD: " << forwardLocToEnd << "\n";
+				dbg("LINE :" << errorLine << " FOWARD: " << forwardLocToEnd << "\n");
 				
 				// Handle multiple undeclared variables in statements
 				// Check if there are multiple errors on this line
@@ -565,14 +566,14 @@ public:
 					basis += std::to_string(Visitor.allVarNames[Visitor.getIndexOfVarName(parsedVar[i])].num_types);
 				}
 				
-				llvm::errs() << "COMBINATIONS: " << combinations << "\n";
+				dbg("COMBINATIONS: " << combinations << "\n");
 				
-				llvm::errs() << "DEBUG: " << varCtr << " " << errorLine.length() << "\n";
+				dbg("DEBUG: " << varCtr << " " << errorLine.length() << "\n");
 				
 				
 				for ( int i = 0;i < combinations;i++) {
 					components = Visitor.getComponents(i,basis);
-					llvm::errs() << basis << " " << components << " " << parsedVar.size() << "\n";
+					dbg( basis << " " << components << " " << parsedVar.size() << "\n");
 					errorLineOrg.assign(errorLine);
 					SS << "if (" ;
 					for ( int j = 0;j<parsedVar.size();j++) {
@@ -606,14 +607,13 @@ public:
 		}
 	}
 	
-	static Sema* mSema;
 	
 private:
 	MyASTVisitor Visitor;
 	int first_visit_flag = 0;
+	Sema* mSema;
 	
 };
-
 
 
 int main(int argc, char *argv[]) {
@@ -665,6 +665,7 @@ int main(int argc, char *argv[]) {
 	Sema mySema(TheCompInst.getPreprocessor(),TheCompInst.getASTContext(),*astConsumer,tuk,NULL);
 	TheConsumer.InitializeSema(mySema);
 	
+	globalSema = &mySema;
 
 	ParseAST(mySema,false,false);
 	//TheConsumer.showVarNames();
