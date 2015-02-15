@@ -36,6 +36,26 @@ How to run this code
 
 - Once you make the modifications you can run make and make test to test the build.
 
+Important Notes
+----
+- This code runs only with LLVM and Clang 3.5 stable release
+WHY? - Clang and libtooling is rapidly evolving and the API calls change often. Trying to make it run for each version is like shooting a moving target!
+- Running make adds a few lines to 2 files in clang and runs a make of clang
+    * include/clang/Sema/Sema.h
+```
+835	/// Added by Adarsh
+836	/// UndeclaredIdentifiers 
+837  std::vector<std::pair<DeclarationName, SourceLocation>> UndeclaredButUsed;
+```
+    * clang/lib/Sema/SemaExpr.cpp
+```
+1740  //Added by Adarsh
+1741  if (diagnostic == diag::err_undeclared_var_use && 
+1742	  Name.getNameKind() == DeclarationName::Identifier) {
+1743	UndeclaredButUsed.push_back(std::make_pair(Name, R.getNameLoc()));
+1744  }
+```
+
 Features
 ----
 Can handle the following declarations
@@ -73,15 +93,23 @@ void f1()
 ``` 
 - Can detect errors if variables that have never been declared anywhere in the program are used
 - Can convert statemnts which have a combination of DeclRef variables and undeclaredButUsed variables
-
+- Works with typedef definitions of variables.
 
 TO FIX
 ----
-- We place our dynamic stuct type all the way on top and if suppose a type struct is defined later we will get an error!!
-- Fix int a,b; in local variable declaration because of replacetext visitVarDecl()
-- including stdio.h gives error
+- We place our dynamic stuct type all the way on top and if suppose a type struct is defined later we will get an error!! :: (HIGH)
+- struct type should be handled using pointer :: (HIGH)
+- Fix int a,b; in local variable declaration because of replacetext visitVarDecl() :: (HIGH)
+- including stdio.h gives error :: (HIGH)
 - Remove ; from global variable declarations
-- if there is a return/break from a scope our restore mechanism won't fix be able to restore global values
+- if there is a return/break from a scope our restore mechanism won't fix be able to restore global values :: (HIGH)
+- no support for arrays	
+
+Download Links
+----
+- http://llvm.org/releases/download.html
+- http://llvm.org/releases/3.5.0/llvm-3.5.0.src.tar.xz
+- http://llvm.org/releases/3.5.0/cfe-3.5.0.src.tar.xz
 
 License
 ----

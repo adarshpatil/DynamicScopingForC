@@ -42,8 +42,8 @@ LLVM_LDFLAGS_NOLIBS := `$(LLVM_BIN_PATH)/llvm-config --ldflags`
 PLUGIN_LDFLAGS := -shared
 
 CLANG_INCLUDES := \
-	-I$(LLVM_SRC_PATH)/tools/clang/include \
-	-I$(LLVM_BUILD_PATH)/tools/clang/include
+	-I $(LLVM_SRC_PATH)/tools/clang/include \
+	-I $(LLVM_BUILD_PATH)/tools/clang/include
 
 # List of Clang libraries to link. The proper -L will be provided by the
 # call to llvm-config
@@ -83,7 +83,7 @@ BUILDDIR := build
 all: make_builddir \
 	emit_build_config \
 	$(BUILDDIR)/rewriter \
-
+	
 
 .PHONY: test
 test: emit_build_config
@@ -95,6 +95,7 @@ emit_build_config: make_builddir
 
 .PHONY: make_builddir
 make_builddir:
+	@./doEcho.sh "$(LLVM_SRC_PATH)" "$(BUILDDIR)" 
 	@test -d $(BUILDDIR) || mkdir $(BUILDDIR)
 
 
