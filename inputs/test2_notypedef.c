@@ -1,15 +1,15 @@
 float bvar=50;
-typedef struct {
+struct who{
 	int z;
-}who;
+};
 int main()
 {
 	int bvar;
 }
 void f()
 {
-	who bvar;
-	who svar;
+	struct who bvar;
+	struct who svar;
 	bvar.z = svar.z = 20;
 	bvar.z = bvar.z + svar.z;
 }

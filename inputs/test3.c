@@ -5,9 +5,13 @@ int main()
 }
 void f()
 {
-	int c=10;
+	int c=10;		
 	if(c==10)
 	{
+		c = c + 10;
+	}
+	{
 		int b=25;
+		b = b * 3;
 	}
 }

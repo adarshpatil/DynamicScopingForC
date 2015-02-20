@@ -66,13 +66,26 @@ public:
 	
 	// Override VisitTypedefDecl - called when a typedef variable is declared
 	bool VisitTypedefDecl(clang::TypedefDecl *d) {
-		dbg("TYPEDEF DECL: "<< QualType::getAsString(d->getUnderlyingType().split())
-							<< " " << d->getName() << "\n");
 		typedefDecl[d->getName()] = QualType::getAsString(d->getUnderlyingType().split());
+		dbg("TYPEDEF DECL: " << d->getName() << " " << typedefDecl[d->getName()] << "\n");
 		return true;
 	}
 	
-	
+	// checks if there is a "." or "->" after this location to check if this is expecting struct access
+	// returns true if there is else false
+	bool isStructAccess(unsigned int loc) {
+		SourceManager &SM = TheRewriter.getSourceMgr();
+		char p = SM.getCharacterData ( SourceLocation::getFromRawEncoding(loc)) [0];
+		while(p == ' ')
+			p = SM.getCharacterData ( SourceLocation::getFromRawEncoding(loc++)) [0];
+			
+		if(p == '.')
+			return true;
+		else if ( p == '-' &&
+				SM.getCharacterData ( SourceLocation::getFromRawEncoding(loc)) [0] == '>' )
+			return true;
+		return false;
+	}
 	// Override VisitDeclRefExpr - called when a declared variable is referenced
 	bool VisitDeclRefExpr(const DeclRefExpr *node) {
 		std::stringstream SS;
@@ -93,8 +106,18 @@ public:
 			
 			dbg("DECL REF LINE: " << declrefLine << "\n");
 			
+			
+			// replace variable names and generate if-else ladder	
+			int structaccessflag = 0;
+			int combinations = 1;
+			std::string basis = "";
+			std::string components;
+			std::string replacedString;
+			std::string declrefLineOrg;
+			
 			// check if we encountered DeclRefExpr earlier in this line
 			// return if this was already processed
+			// all visited declref are stored in visitedDeclRef
 			for (std::vector<std::pair<std::string, SourceLocation>>::iterator
 					I = visitedDeclRef.begin(), E = visitedDeclRef.end();
 					I != E;I++) {
@@ -102,27 +125,61 @@ public:
 					// get only unique names i.e a=a+b gives only a,b
 					if ( strcmp(name.c_str(),I->first.c_str()) == 0)
 						return true;
-					parsedVar.push_back(I->first);
+					
+					// if variable in statement is expecting struct type
+					// generate error message for all other types except stuct for that variable
+					if( isStructAccess(I->second.getRawEncoding()+I->first.length()) ) {
+						int structtypeindex;
+						for ( int k=0;k<allVarNames[getIndexOfVarName(I->first)].num_types;k++ ) {
+							if (allVarNames[getIndexOfVarName(I->first)].types[k].find("struct") != std::string::npos || 
+								typedefDecl[allVarNames[getIndexOfVarName(I->first)].types[k]].find("struct") != std::string::npos) {
+								structtypeindex = k;
+								continue;
+							}
+							SS 	<< "if(" << I->first << ".type==" << k << "){"
+								<< "printf(\"ERROR: EXPECTING STRUCT TYPE\"); exit(1);}\n\t";
+						}
+						replacedString = I->first + ".du." + 
+										allVarNames[getIndexOfVarName(I->first)].types[structtypeindex] + "val->";
+						replaceAll(declrefLine, I->first+".", replacedString); 
+					}
+					else 
+						parsedVar.push_back(I->first);
 				}
 			}
 			
-			
+				
 			// push into vector as this is encountered first time
 			visitedDeclRef.push_back(std::make_pair(name, drLoc));
+			
+				
+			if ( isStructAccess(drLoc.getRawEncoding()+name.length()) ) {
+				structaccessflag = 1;
+				int structtypeindex;
+				for ( int k=0;k<allVarNames[getIndexOfVarName(name)].num_types;k++ ) {
+					if (allVarNames[getIndexOfVarName(name)].types[k].find("struct") != std::string::npos || 
+						typedefDecl[allVarNames[getIndexOfVarName(name)].types[k]].find("struct") != std::string::npos) {
+							structtypeindex = k;
+							continue;
+					}
+					SS 	<< "if(" << name << ".type==" << k << "){"
+						<< "printf(\"ERROR: EXPECTING STRUCT TYPE\"); exit(1);}\n\t";
+				}
+				replacedString = name + ".du." + 
+								allVarNames[getIndexOfVarName(name)].types[structtypeindex] + "val->";
+				replaceAll(declrefLine, name+".", replacedString);
+			}
+			
+			if(parsedVar.size() == 0 && structaccessflag ) {
+				SS << declrefLine << ";\n";
+				rewriterDeclRef[ SourceLocation::getFromRawEncoding( drLoc.getRawEncoding()-back+1 ) ] = SS.str();
+				return true;
+			}
+			
 			parsedVar.push_back(name);
 			
 			dbg("Unique LENGTH: " << parsedVar.size() << "\n");	
 					
-			
-			
-			// replace variable names and generate if-else ladder
-			
-				
-			int combinations = 1;
-			std::string basis = "";
-			std::string components;
-			std::string replacedString;
-			std::string declrefLineOrg;
 				
 			for( int i = 0;i< parsedVar.size();i++) {
 				combinations *= allVarNames[getIndexOfVarName(parsedVar[i])].num_types;
@@ -138,7 +195,7 @@ public:
 				components = getComponents(i,basis);
 				dbg( basis << " " << components << " " << parsedVar.size() << "\n");
 				declrefLineOrg.assign(declrefLine);
-				SS << "if (" ;
+				SS << "if(" ;
 				for ( int j = 0;j<parsedVar.size();j++) {
 					replacedString =parsedVar[j] + ".du." +
 									allVarNames[getIndexOfVarName(parsedVar[j])].types
@@ -199,6 +256,7 @@ public:
 		unsigned int backloc = loc-1;
 		unsigned int forwardloc = loc;
 		char pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(forwardloc)) [0] ;
+		int blockflag = 0;
 		while ( pc != ';')  {
 			returnString = returnString + pc;
 			pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(++forwardloc)) [0];
@@ -372,7 +430,21 @@ public:
 			SS << "\n\t" << name << ".type = " << type_index << ";\n";
 			if (D->hasInit()) {
 				dbg(" QUALIFIED NAME: " << D->getQualifiedNameAsString() << "\n");
-				SS << "\t" << name << ".du." << allVarNames[index].types[type_index] << "val = " << initVal << ";\n";
+				// check if its struct type
+				if( type.find("struct") != std::string::npos ) {
+					type.replace(6,1," ");
+					SS 	<< "\t" << name << ".du." << allVarNames[index].types[type_index] 
+						<< "val = malloc(sizeof( " << type << "));\n";
+					std::replace( type.begin(), type.end(), ' ', '_');
+				}
+				
+				// check if its typedef struct type
+				else if( typedefDecl[type].find("struct") != std::string::npos ) 
+					SS 	<< "\t" << name << ".du." << allVarNames[index].types[type_index] 
+						<< "val = malloc(sizeof( " << type << "));\n";
+				
+				else 
+					SS << "\t" << name << ".du." << allVarNames[index].types[type_index] << "val = " << initVal << ";\n";
 			}
 			
 			TheRewriter.ReplaceText(SourceRange(D->getLocStart(),
@@ -389,7 +461,7 @@ public:
 			for( int i = 0; i < allVarNames[index].num_types; i++)
 				SS 	<< "\t" << name << ".du." << allVarNames[index].types[i] << "val = " 
 					<< backupvar << ".du." <<allVarNames[index].types[i] <<"val; ";	
-			SS << "\n";
+			SS << name << ".type = " << backupvar << ".type;\n";
 			
 			TheRewriter.InsertText(D->getSourceRange().getBegin().getLocWithOffset(offset), 
 									SS.str(), false, true);
@@ -441,6 +513,7 @@ public:
 		SourceLocation globalInit = SourceLocation::getFromRawEncoding(globalInitLoc);
 		
 		SSStruct << "#include<stdlib.h>\n";
+		SSStruct << "#include<stdio.h>\n";
 		SSStruct << "//Declaring all Variables of DynamicType\n";
 		SSInit << " \n\t//Initalizing global variables\n";
 		
@@ -453,7 +526,8 @@ public:
 					it->types[t].replace(6,1," "); 
 				SSStruct << it->types[t]; 
 				std::replace( it->types[t].begin(), it->types[t].end(), ' ', '_');
-				if (it->types[t].find("struct") != std::string::npos)
+				if (it->types[t].find("struct") != std::string::npos || 
+					typedefDecl[it->types[t]].find("struct") != std::string::npos)
 					SSStruct << " *" << it->types[t] <<"val;";
 				else
 					SSStruct << " " << it->types[t] <<"val;";

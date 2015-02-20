@@ -1,7 +1,8 @@
 int f1();
 int main()
 {
-	int a,b=10;
+	int a;
+	int b=10;
 	f1();
 }
 int z;

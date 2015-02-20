@@ -104,6 +104,8 @@ TO FIX
 - Remove ; from global variable declarations
 - if there is a return/break from a scope our restore mechanism won't fix be able to restore global values :: (HIGH)
 - no support for arrays	
+- will not support single line if or for blocks without parathesis i.e. always use parantheis for if/switch/for/function blocks even if they are single line blocks
+- initializations within if ( i am stupid coding this )
 
 Download Links
 ----
