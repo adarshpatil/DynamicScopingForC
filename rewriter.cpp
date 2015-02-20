@@ -56,12 +56,14 @@ private:
 	unsigned int globalInitLoc;
 	std::vector<std::pair<std::string, SourceLocation>> visitedDeclRef;
 	std::map<std::string, std::string> typedefDecl;
+	std::vector<std::pair<unsigned int, unsigned int>> blockBoundry;
 	
 public:
 	MyASTVisitor(Rewriter &R) : TheRewriter(R) {}
 	
 	// Map from SourceLocation to rewriter stringstream
 	std::map<SourceLocation, std::string> rewriterDeclRef;
+	std::map<SourceLocation, std::string> rewriterVarDecl;
 	
 	
 	// Override VisitTypedefDecl - called when a typedef variable is declared
@@ -258,6 +260,18 @@ public:
 		char pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(forwardloc)) [0] ;
 		int blockflag = 0;
 		while ( pc != ';')  {
+			
+			if ( pc == '{' ) {
+				blockflag = 1;
+				while ( pc != '}') {
+					returnString = returnString + pc;
+					pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(++forwardloc)) [0];
+				}
+				returnString = returnString + pc;
+			}
+			
+			if (blockflag == 1) 
+				break;
 			returnString = returnString + pc;
 			pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(++forwardloc)) [0];
 		}
@@ -265,6 +279,10 @@ public:
 		while ( pc != ';' && pc!='{' && pc!='\n' && pc!='}') {
 			returnString = pc + returnString;
 			pc = SM.getCharacterData ( SourceLocation::getFromRawEncoding(--backloc)) [0];
+		}
+		if (blockflag  == 1) {
+			dbg("COMPLETE BLOCK" << returnString);
+			blockBoundry.push_back( std::make_pair(backloc,forwardloc) );
 		}
 		return (forwardloc - loc);
 	}	
@@ -447,9 +465,15 @@ public:
 					SS << "\t" << name << ".du." << allVarNames[index].types[type_index] << "val = " << initVal << ";\n";
 			}
 			
-			TheRewriter.ReplaceText(SourceRange(D->getLocStart(),
-												SourceLocation::getFromRawEncoding(D->getLocEnd().getRawEncoding()+2)),
-									SS.str());
+			SS << "\n";
+			if ( rewriterVarDecl.find(D->getLocStart()) != rewriterVarDecl.end() )
+				rewriterVarDecl[ D->getLocStart() ] += SS.str();
+			else
+				rewriterVarDecl[ D->getLocStart() ] = SS.str();
+				
+			//TheRewriter.ReplaceText(SourceRange(D->getLocStart(),
+			//									SourceLocation::getFromRawEncoding(D->getLocEnd().getRawEncoding()+2)),
+			//						SS.str());
 									
 			// Flush SS (String Stream)
 			SS.str("");
@@ -602,9 +626,19 @@ public:
 	// Rename the undefined variables to corresponding dynamic structs
 	void renameUndefinedButUsed() {
 		
-		// rewrite VisitVarDecl strings into rewrite buffer
+		// rewrite VisitDeclRef strings into rewrite buffer
 		for( std::map<SourceLocation, std::string>::iterator
 				I = Visitor.rewriterDeclRef.begin(), E = Visitor.rewriterDeclRef.end();
+				I != E; I++) {
+					std::string line;
+					Visitor.getCompleteLine(line,I->first.getRawEncoding());
+					Visitor.TheRewriter.ReplaceText(I->first, line.length()+1 , I->second);
+					dbg( "Rewriting VisitDeclRef SL: " << I->first.getRawEncoding() << " " << I->second << "\n");
+		}
+		
+		//rewrite VisitVarDecl strings into rewrite buffer
+		for( std::map<SourceLocation, std::string>::iterator
+				I = Visitor.rewriterVarDecl.begin(), E = Visitor.rewriterVarDecl.end();
 				I != E; I++) {
 					std::string line;
 					Visitor.getCompleteLine(line,I->first.getRawEncoding());

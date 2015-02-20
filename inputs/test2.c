@@ -8,8 +8,7 @@ int main()
 }
 void f()
 {
-	who bvar;
-	who svar;
+	who bvar, svar;
 	bvar.z = svar.z = 20;
 	bvar.z = bvar.z + svar.z;
 }
