@@ -24,7 +24,7 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Lex/Token.h"
 
-#define DEBUG 1
+#define DEBUG 1      // set debug to 0 to turn off debug messages on stderr
 #define dbg(...) if(DEBUG != 0) { \
 	llvm::errs() << __VA_ARGS__; }
 using namespace clang;
@@ -660,7 +660,7 @@ public:
 				int forwardLocToEnd = Visitor.getCompleteLine(errorLine, I->second.getRawEncoding());
 				int varCtr = 1;
 				
-				dbg("LINE :-" << errorLine << "- FOWARD: " << forwardLocToEnd << "\n");
+				dbg("LINE :" << errorLine << " FOWARD: " << forwardLocToEnd << "\n");
 				
 				// Handle multiple undeclared variables in statements
 				// Check if there are multiple errors on this line
