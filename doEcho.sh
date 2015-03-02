@@ -1,5 +1,6 @@
 #!/bin/bash
-[ -f .clangdone ] && echo "clang done"; exit 0
+[ -f .clangdone ] && echo "clang done"; 
+[ -f .clangdone ] && exit 0;
 MYPWD=`pwd`
 INCFILE="$1/tools/clang/include/clang/Sema/Sema.h"
 LIBFILE="$1/tools/clang/lib/Sema/SemaExpr.cpp"
@@ -7,6 +8,7 @@ echo "==============="
 echo "INCLUDE FILE " $INCFILE
 echo "LIB FILE" $LIBFILE
 echo "PWD" $MYPWD
+echo "CLANG DIR" $2
 echo "================"
 
 
@@ -27,6 +29,7 @@ echo "  /// Added by Adarsh
 tail -n 7671 $INCFILE >> $INCFILE.new
 mv $INCFILE.new $INCFILE
 
+echo "Running make on clang"
 cd $2
 make -j `nproc`
 cd $MYPWD

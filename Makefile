@@ -95,7 +95,7 @@ emit_build_config: make_builddir
 
 .PHONY: make_builddir
 make_builddir:
-	@./doEcho.sh "$(LLVM_SRC_PATH)" "$(BUILDDIR)" 
+	@./doEcho.sh "$(LLVM_SRC_PATH)" "$(LLVM_BUILD_PATH)" 
 	@test -d $(BUILDDIR) || mkdir $(BUILDDIR)
 
 
