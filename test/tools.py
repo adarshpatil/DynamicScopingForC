@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import difflib
 import os
 import subprocess

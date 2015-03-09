@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import os, sys, unittest
 
 if not os.path.isdir('inputs') or not os.path.isdir('build'):

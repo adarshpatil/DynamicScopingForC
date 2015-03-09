@@ -582,6 +582,15 @@ public:
 		std::stringstream SST;
 		globalDeclLoc = ST.getRawEncoding();
 	}
+	
+	bool isHeaderFunc(std::string func) {
+		std::vector<std::string> headerFuncs{"pow", "sqrt", "printf"};
+		for( int i =0;i<headerFuncs.size();i++)
+			if(!func.c_str(),headerFuncs[i].c_str())
+				return true;
+		return false;
+	}
+		
   
 };
 
@@ -650,7 +659,8 @@ public:
 				I = mSema->UndeclaredButUsed.begin(), E = mSema->UndeclaredButUsed.end();
 				I != E;) {
 			dbg( "UNDEFINED BUT USED " << I->first.getAsString() << " " << I->second.getRawEncoding() << "\n");
-			if ( Visitor.isNewVarName(I->first.getAsString()) ) {
+
+			if ( Visitor.isNewVarName(I->first.getAsString()) && !Visitor.isHeaderFunc(I->first.getAsString()) ) {
 				die("ERROR: UNDEFINED IDENTIFIER " << I->first.getAsString() << " AT LOC " 
 						<< I->second.getRawEncoding() <<"\n");
 			}	
@@ -675,6 +685,8 @@ public:
 					if ( std::find( parsedVar.begin(), 
 									parsedVar.end(), 
 									(I+i)->first.getAsString() ) == parsedVar.end()) {
+						if(Visitor.isHeaderFunc((I+i)->first.getAsString()) )
+							continue;
 						parsedVar.push_back( (I+i)->first.getAsString() );
 						SS 	<< "if (" << (I+i)->first.getAsString() << ".type==-1) {"
 							<< "printf(\"ERROR: VARIABLE " << (I+i)->first.getAsString() << " IS UNDEFINED AT LOC " 
@@ -682,7 +694,7 @@ public:
 						
 					}
 				}
-				
+						
 				// check if there are any VisitDeclRef variables in this line
 				int back = errorLine.length()-forwardLocToEnd;
 				int startloc = I->second.getRawEncoding() - back;
@@ -708,7 +720,7 @@ public:
 					dbg(" tokenlen: " << tokenlen << "\n");
 				}
 				
-			
+				
 				int combinations = 1;
 				std::string basis = "";
 				std::string components;
@@ -736,7 +748,6 @@ public:
 						
 						
 						Visitor.replaceAll(errorLine, parsedVar[j], replacedString);
-						//std::replace(errorLine.begin(), errorLine.end(), parsedVar[i], replacedString );
 						
 						SS 	<< parsedVar[j] << ".type==" << components[j]; 
 						if((j+1) < parsedVar.size())
@@ -807,7 +818,7 @@ int main(int argc, char *argv[]) {
       SourceMgr.createFileID(FileIn, SourceLocation(), SrcMgr::C_User));
 	TheCompInst.getDiagnosticClient().BeginSourceFile(
       TheCompInst.getLangOpts(), &TheCompInst.getPreprocessor());
-	
+
 	// Create an AST consumer instance which is going to get called by
 	// ParseAST.
 	ChainedConsumer TheConsumer(TheRewriter);
