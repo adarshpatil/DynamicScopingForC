@@ -2,13 +2,13 @@
 #include<math.h>
 void f()
 {
-	float a = 121;
-	printf("in f %f\n",sqrt(a));
+	float k = 121;
+	printf("in f %f\n",sqrt(k));
 }
 int main()
 {
-	int a = 5;
-	printf("in here %f\n",pow(2,a));
+	int k = 5;
+	printf("in main %f\n",pow(2,k));
 	f();
 	return 0;
 }

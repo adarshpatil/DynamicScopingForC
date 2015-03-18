@@ -359,9 +359,11 @@ public:
 		return (av.num_types+1);
 	}
 	
+	
 	// Override VisitVarDecl - called when a variable is Declared
 	bool VisitVarDecl(const VarDecl *D) {
 		bool isGlobal = !D->isLocalVarDecl();
+		bool isParam = false;
 		std::string type = QualType::getAsString(D->getType().split());
 		
 		// we do this below to accomodate definitions with struct myStruct var; replace to struct_myStruct
@@ -369,6 +371,18 @@ public:
 		
 		std::string name = D->getName();
 		std::string initVal;
+		
+		dbg("PARAM VAR: " << name << " global: " << isGlobal << " param: " << isParam <<"\n");
+		
+		const DeclContext *DC = D->getLexicalDeclContext()->getRedeclContext();
+		// only function declarations not definitions
+		if(DC->isFunctionOrMethod() && (D->getKind() == Decl::ParmVar)) {
+			FunctionDecl *FD = FunctionDecl::castFromDeclContext(DC);
+			if(FD->hasBody()) {
+				isGlobal = false;
+				isParam = true;
+			}
+		}
 		
 		
 		if( D->hasInit() )
@@ -466,7 +480,15 @@ public:
 			}
 			
 			SS << "\n";
-			if ( rewriterVarDecl.find(D->getLocStart()) != rewriterVarDecl.end() )
+			if( isParam ) {
+				const DeclContext *DC = D->getLexicalDeclContext()->getRedeclContext();
+				FunctionDecl *f = FunctionDecl::castFromDeclContext(DC);
+				SourceLocation startLoc = SourceLocation::getFromRawEncoding(f->getBody()->getLocStart().getRawEncoding()+1);
+				TheRewriter.InsertText(startLoc,SS.str(),true,true);
+				TheRewriter.RemoveText(D->getSourceRange());				
+			}
+				
+			else if ( rewriterVarDecl.find(D->getLocStart()) != rewriterVarDecl.end() )
 				rewriterVarDecl[ D->getLocStart() ] += SS.str();
 			else
 				rewriterVarDecl[ D->getLocStart() ] = SS.str();
@@ -479,7 +501,18 @@ public:
 			SS.str("");
 			
 			// Restore from backup variable at end of scope
-			unsigned int offset = getOffsetToEndScope( D->getSourceRange().getBegin().getRawEncoding() );
+			unsigned int  offset;
+			SourceLocation insertLoc;
+			if ( isParam ) {
+				const DeclContext *DC = D->getLexicalDeclContext()->getRedeclContext();
+				FunctionDecl *f = FunctionDecl::castFromDeclContext(DC);	
+				offset = getOffsetToEndScope(f->getBody()->getLocStart().getRawEncoding()+1);
+				insertLoc = f->getBody()->getLocStart().getLocWithOffset(offset);
+			}
+			else {
+				offset = getOffsetToEndScope( D->getSourceRange().getBegin().getRawEncoding() );
+				insertLoc = D->getSourceRange().getBegin().getLocWithOffset(offset);
+			}
 			
 			SS << "\n\t//Restoring from backup variables\n";
 			for( int i = 0; i < allVarNames[index].num_types; i++)
@@ -487,8 +520,9 @@ public:
 					<< backupvar << ".du." <<allVarNames[index].types[i] <<"val; ";	
 			SS << name << ".type = " << backupvar << ".type;\n";
 			
-			TheRewriter.InsertText(D->getSourceRange().getBegin().getLocWithOffset(offset), 
-									SS.str(), false, true);
+			
+			TheRewriter.InsertText(insertLoc, SS.str(), false, true);
+		
 		}
 		
 		return true;
