@@ -1,14 +1,25 @@
-float bvar=50;
 struct who{
 	int z;
 };
+void foo();
+void test();
 int main()
 {
-	int bvar;
+	float bvar=2.45;
+	foo();
+
+	printf("IN MAIN BEFORE TEST BVAR:%f\n",bvar);
+	test();
+	printf("IN MAIN AFTER TEST BVAR:%f\n",bvar);
 }
-void f()
+void foo()
 {
-	struct who bvar,svar;
+	who bvar, svar;
 	bvar.z = svar.z = 20;
 	bvar.z = bvar.z + svar.z;
+	printf("IN FOO BVAR.Z:%d SVAR.Z:%d\n",bvar.z,svar.z);
+}
+void test()
+{
+	bvar = bvar * 2;
 }

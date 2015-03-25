@@ -1,17 +1,15 @@
 #include<stdio.h>
-void f(int c);
-int c = 10,b;
+void func(int c);
+int var = 10;
 int main()
 {
-	int c = 50;
-	printf("before f in main:%d\n",c);
-	f(c);
-	printf("after f in main: %d\n",c);
+	printf("BEFORE FUNC IN MAIN:%d\n",var);
+	func(var);
+	printf("AFTER FUNC IN MAIN: %d\n",var);
 	return 0;
 }
-void f(int c)
+void func(int var)
 {
-	int b=2;
-	c = c + 100;
-	printf("in f %d\n",c);
+	var = var + 76;
+	printf("IN FUNC %d\n",var);
 }

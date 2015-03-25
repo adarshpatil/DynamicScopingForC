@@ -1,27 +1,26 @@
+#include<math.h>
 float c=2.5,b=5.2;
-void f();
-void f1()
-{
-	float mainvar = 1.0;
-	f();
-}
+void func();
 int main()
 {
-	int b;
+	int b=1000;
 	int mainvar=1;
-	f();
-	f1();
+	printf("IN MAIN C:%f\n",c);
+	func();
 }
-void f()
+void func()
 {
 	int c=10;
 	{
-		int b=25;
-		b = b * 3;
+		int b=5;
+		b = pow(b,3);
+		printf("INSIDE BLOCK B:%d\n",b);
 	}
+	printf("INSIDE FUNC MAINVAR:%d B:%d\n",mainvar,b);
 	if(mainvar==1)
 	{
 		mainvar++;
-		cvar = cvar * 2;
+		c = c * 2;
 	}
+	printf("INSIDE FUNC C:%d\n",c);
 }

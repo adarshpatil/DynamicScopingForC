@@ -1,17 +1,25 @@
-int f1();
+#include<stdio.h>
+int b=100;
+void adder();
 void f2()
 {
-	float a;
+	float a=10.2;
+	adder();
+	printf("IN F2:%f\n",a);
+}
+void f1()
+{
+	int a=5000;
+	adder();
+	printf("IN F1:%d\n",a);
 }
 int main()
 {
-	int a=2,b=10;
 	f1();
+	f2();
+	return 0;
 }
-int f1()
+void adder()
 {
-	a=10;
-	a=b+a;
-	a=f2();
-	return a;
+	a = a+b;
 }

@@ -88,6 +88,7 @@ public:
 			return true;
 		return false;
 	}
+	
 	// Override VisitDeclRefExpr - called when a declared variable is referenced
 	bool VisitDeclRefExpr(const DeclRefExpr *node) {
 		std::stringstream SS;
@@ -189,16 +190,22 @@ public:
 			}
 				
 				
-			dbg( "COMBINATIONS: " << combinations << "\n");
+			dbg( "COMBINATIONS: " << combinations <<  " BASIS " << basis << "\n");
 				
 				
 				
 			for ( int i = 0;i < combinations;i++) {
+				components.assign("");
 				components = getComponents(i,basis);
 				dbg( basis << " " << components << " " << parsedVar.size() << "\n");
 				declrefLineOrg.assign(declrefLine);
+				
 				SS << "if(" ;
 				for ( int j = 0;j<parsedVar.size();j++) {
+					if( allVarNames[getIndexOfVarName(parsedVar[j])].types[components[j]-'0'].find("struct") != std::string::npos ||
+						typedefDecl[allVarNames[getIndexOfVarName(parsedVar[j])].types[components[j]-'0']].find("struct") != std::string::npos )
+						continue;
+						
 					replacedString =parsedVar[j] + ".du." +
 									allVarNames[getIndexOfVarName(parsedVar[j])].types
 										[components[j]-'0'] + "val";
@@ -206,7 +213,8 @@ public:
 						
 					replaceAll(declrefLine, parsedVar[j], replacedString);
 						
-					SS 	<< parsedVar[j] << ".type==" << components[j]; 
+					SS 	<< parsedVar[j] << ".type==" << components[j];
+							
 					if((j+1) < parsedVar.size())
 						SS << " && ";
 						
@@ -317,19 +325,24 @@ public:
 		std::string components="";
 		std::string rcomponents="";
 		
-		while( num < basis[i] ) {
+		while( num < basis[i] && i>=0) {
 			components += std::to_string(num % (basis[i]-'0'));
 			num = num / (basis[i] - '0');
 			i--;
+			dbg("1value of i: "<< i << "\n");
 		}
-		if ( i>=0 )
+		
+		if ( i>=0 ) {
+			components += "0";
+			dbg("2value of i: "<< i << "\n");
 			while(i!=0) {
 				components += "0";
 				i--;
 			}
-			
-		components+="\0";
+		}
 		
+		components+="\0";
+		dbg("getComponents :" << components << "\n");
 		for (std::string::reverse_iterator rit=components.rbegin(); rit!=components.rend(); ++rit)
 			rcomponents += *rit;
 		
@@ -493,11 +506,7 @@ public:
 			else
 				rewriterVarDecl[ D->getLocStart() ] = SS.str();
 				
-			//TheRewriter.ReplaceText(SourceRange(D->getLocStart(),
-			//									SourceLocation::getFromRawEncoding(D->getLocEnd().getRawEncoding()+2)),
-			//						SS.str());
-									
-			// Flush SS (String Stream)
+
 			SS.str("");
 			
 			// Restore from backup variable at end of scope
@@ -615,16 +624,32 @@ public:
 	void insertDynamicTypeStruct(SourceLocation ST){
 		std::stringstream SST;
 		globalDeclLoc = ST.getRawEncoding();
+		dbg(" GLOBAL DECL LOC " << globalDeclLoc << "\n");
+		if(globalDeclLoc != 2) {
+			char typedefcheck[9];
+			SourceManager &SM = TheRewriter.getSourceMgr();
+			std::memcpy(typedefcheck, SM.getCharacterData(SourceLocation::getFromRawEncoding(globalDeclLoc-8)),8);
+			typedefcheck[8]='\0';
+			dbg(typedefcheck<<":\n");
+			if( !strcmp(typedefcheck,"typedef ")  )
+				globalDeclLoc -= 8;
+
+		}
 	}
 	
 	bool isHeaderFunc(std::string func) {
 		std::vector<std::string> headerFuncs{"pow", "sqrt", "printf"};
 		for( int i =0;i<headerFuncs.size();i++)
-			if(!func.c_str(),headerFuncs[i].c_str())
+			if(!strcmp(func.c_str(),headerFuncs[i].c_str()))
 				return true;
 		return false;
 	}
-		
+	
+	bool isprintf(std::string func) {
+		if(!strcmp( func.c_str(),"printf") )
+			return true;
+		return false;
+	}
   
 };
 
@@ -639,9 +664,6 @@ public:
 	// declaration.
 	virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
 		for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b){
-			//llvm::errs() << "\n\n******TOP LEVEL DECL******\n";
-			//(*b)->dump();
-			//llvm::errs() << "\n";
 			if ( first_visit_flag == 0 ) {
 				first_visit_flag  = 1;
 				SourceLocation ST = (*b)->getLocStart();
@@ -666,9 +688,8 @@ public:
 	}
 	
 	
-	// Rename the undefined variables to corresponding dynamic structs
-	void renameUndefinedButUsed() {
-		
+	void doPostRewrite()
+	{
 		// rewrite VisitDeclRef strings into rewrite buffer
 		for( std::map<SourceLocation, std::string>::iterator
 				I = Visitor.rewriterDeclRef.begin(), E = Visitor.rewriterDeclRef.end();
@@ -689,11 +710,18 @@ public:
 					dbg( "Rewriting VisitVarDecl SL: " << I->first.getRawEncoding() << " " << I->second << "\n");
 		}
 		
+	}
+	
+	// Rename the undefined variables to corresponding dynamic structs
+	void renameUndefinedButUsed() {
+		
+		doPostRewrite();
+		
 		for (std::vector<std::pair<DeclarationName, SourceLocation>>::iterator
 				I = mSema->UndeclaredButUsed.begin(), E = mSema->UndeclaredButUsed.end();
 				I != E;) {
 			dbg( "UNDEFINED BUT USED " << I->first.getAsString() << " " << I->second.getRawEncoding() << "\n");
-
+	
 			if ( Visitor.isNewVarName(I->first.getAsString()) && !Visitor.isHeaderFunc(I->first.getAsString()) ) {
 				die("ERROR: UNDEFINED IDENTIFIER " << I->first.getAsString() << " AT LOC " 
 						<< I->second.getRawEncoding() <<"\n");
@@ -703,38 +731,52 @@ public:
 				std::stringstream SS;
 				int forwardLocToEnd = Visitor.getCompleteLine(errorLine, I->second.getRawEncoding());
 				int varCtr = 1;
+				int errorLineLength;
 				
 				dbg("LINE :" << errorLine << " FOWARD: " << forwardLocToEnd << "\n");
+				errorLineLength = errorLine.length();
 				
 				// Handle multiple undeclared variables in statements
 				// Check if there are multiple errors on this line
-				for (std::vector<std::pair<DeclarationName, SourceLocation>>::iterator
-						K = (I+1); K != E; ++K)
+				int structtypeindex;
+				std::string replacedString;
+				std::string errorLineStruct;
+				errorLineStruct.assign(errorLine);
+				
+				for (std::vector<std::pair<DeclarationName, SourceLocation>>::iterator K = (I+1); K != E; ++K) {
 					if ( K->second.getRawEncoding() <=  (I->second.getRawEncoding()+forwardLocToEnd) )
 						varCtr++;
-
+				}
+				
+				dbg("VARCTR: " << varCtr << "\n");
 				// Generate if-else ladder
 				std::vector<std::string> parsedVar;  // stores all unique variables encountered in line
 				for( int i = 0;i<varCtr; i++) {
 					if ( std::find( parsedVar.begin(), 
 									parsedVar.end(), 
 									(I+i)->first.getAsString() ) == parsedVar.end()) {
-						if(Visitor.isHeaderFunc((I+i)->first.getAsString()) )
+						
+						if( Visitor.isHeaderFunc((I+i)->first.getAsString()) )
 							continue;
-						parsedVar.push_back( (I+i)->first.getAsString() );
+							
 						SS 	<< "if (" << (I+i)->first.getAsString() << ".type==-1) {"
 							<< "printf(\"ERROR: VARIABLE " << (I+i)->first.getAsString() << " IS UNDEFINED AT LOC " 
 							<< (I+i)->second.getRawEncoding() <<"\"); exit(1);}\n";
 						
+						if( !Visitor.isStructAccess((I+i)->second.getRawEncoding() + (I+i)->first.getAsString().length()) )
+							parsedVar.push_back( (I+i)->first.getAsString() );
+							
 					}
 				}
-						
+				
+				
 				// check if there are any VisitDeclRef variables in this line
 				int back = errorLine.length()-forwardLocToEnd;
 				int startloc = I->second.getRawEncoding() - back;
 				int iterloc = startloc;
 				int tokenlen;
 				Token Result;
+				
 				while( iterloc <= (startloc + errorLine.length()) ) {
 					if( errorLine[iterloc - startloc] == ' ' || errorLine[iterloc - startloc] == '\t') {
 						iterloc++;
@@ -746,19 +788,40 @@ public:
 					tokenlen = Result.getLength();
 					std::string token = errorLine.substr( iterloc - startloc, tokenlen);
 					dbg("Token: " << token << " iterloc: " << iterloc);
-					if( !Visitor.isNewVarName(token) && (std::find(parsedVar.begin(), parsedVar.end(), token) == parsedVar.end()) ) {
-						parsedVar.push_back( Visitor.allVarNames[Visitor.getIndexOfVarName( token )].vName );
-						dbg("\n ADDED: "<< Visitor.allVarNames[Visitor.getIndexOfVarName( token )].vName);
+					if( !Visitor.isNewVarName(token) 
+						&& (std::find(parsedVar.begin(), parsedVar.end(), token) == parsedVar.end())
+						&& !Visitor.isStructAccess(iterloc+tokenlen) ) {
+							parsedVar.push_back( Visitor.allVarNames[Visitor.getIndexOfVarName( token )].vName );
+							dbg("\n ADDED: "<< Visitor.allVarNames[Visitor.getIndexOfVarName( token )].vName);
+					}
+					
+					dbg(" tokenlen: " << tokenlen << "\n");
+					
+					if( Visitor.isStructAccess(iterloc+tokenlen) ) {
+							
+						dbg("struct access " << token << " " << iterloc << "\n");
+						for(int i=0;i<Visitor.allVarNames[Visitor.getIndexOfVarName(token)].num_types;i++) {
+							if (Visitor.allVarNames[Visitor.getIndexOfVarName(token)].types[i].find("struct") != std::string::npos || 
+								Visitor.typedefDecl[Visitor.allVarNames[Visitor.getIndexOfVarName(token)].types[i]].find("struct") != std::string::npos) {
+									structtypeindex = i;
+								continue;
+							}
+							SS 	<< "if(" << token << ".type==" << i << "){"
+								<< "printf(\"ERROR: EXPECTING STRUCT TYPE\"); exit(1);}\n\t";
+						}
+						replacedString = token + ".du." + 
+									Visitor.allVarNames[Visitor.getIndexOfVarName(token)].types[structtypeindex] + "val->";
+						Visitor.replaceAll(errorLineStruct, token+".", replacedString);
+	
 					}
 					iterloc = iterloc + tokenlen;
-					dbg(" tokenlen: " << tokenlen << "\n");
 				}
 				
+				errorLine.assign(errorLineStruct);
 				
 				int combinations = 1;
 				std::string basis = "";
 				std::string components;
-				std::string replacedString;
 				std::string errorLineOrg;
 				for( int i = 0;i< parsedVar.size();i++) {
 					combinations *= Visitor.allVarNames[Visitor.getIndexOfVarName(parsedVar[i])].num_types;
@@ -767,12 +830,16 @@ public:
 				
 				dbg("COMBINATIONS: " << combinations << "\n");
 				
-				dbg("VARCTR and LINE: " << varCtr << " " << errorLine.length() << "\n");
+				dbg("PARSEDVAR SIZE and LINE: " << parsedVar.size() << " " << errorLine.length() << "\n");
 				
 				
 				for ( int i = 0;i < combinations;i++) {
 					components = Visitor.getComponents(i,basis);
-					dbg( basis << " " << components << " " << parsedVar.size() << "\n");
+					dbg( basis << " : " << components << " : " << parsedVar.size() << "\n");
+					if(parsedVar.size() == 0) {
+						SS << errorLine << ";\n";
+						continue;
+					}
 					errorLineOrg.assign(errorLine);
 					SS << "if (" ;
 					for ( int j = 0;j<parsedVar.size();j++) {
@@ -795,8 +862,8 @@ public:
 				
 				//Replace text from the program
 				unsigned int beginLoc = I->second.getRawEncoding();
-				beginLoc = beginLoc - (errorLine.length() - forwardLocToEnd);
-				Visitor.TheRewriter.ReplaceText(SourceLocation::getFromRawEncoding(beginLoc), errorLine.length()+1, SS.str());
+				beginLoc = beginLoc - (errorLineLength - forwardLocToEnd);
+				Visitor.TheRewriter.ReplaceText(SourceLocation::getFromRawEncoding(beginLoc), errorLineLength+1, SS.str());
 				
 				// Skip VarCtr iterations ahead
 				I = I + varCtr;
