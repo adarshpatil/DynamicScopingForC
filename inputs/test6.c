@@ -4,3 +4,6 @@ int main()
 	a[0]=1;
 	return 0;
 }
+
+/*HIGHLIGHTS
+Arrays does not work*/

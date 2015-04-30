@@ -8,10 +8,10 @@ OUTPUT = '''\
 //Declaring all Variables of DynamicType
 typedef struct {int type; union{int intval;}du;} atype;
 typedef struct {int type; union{float floatval;}du;} btype;
-typedef struct {int type; union{float floatval;}du;} fbtype;
-typedef struct {int type; union{int intval;}du;} fatype;
+typedef struct {int type; union{float floatval;}du;} fytype;
+typedef struct {int type; union{int intval;}du;} fxtype;
 
-atype a; btype b; fbtype fb; fatype fa; 
+atype a; btype b; fytype fy; fxtype fx; 
 
 ;
 void f	();
@@ -20,8 +20,8 @@ int main()
 	//Initalizing global variables
 	a.type = 0;	a.du.intval = 10;
 	b.type = -1;
-	fb.type = -1;
-	fa.type = -1;
+	fy.type = -1;
+	fx.type = -1;
 
 
 	//Backup global struct before local init
@@ -31,7 +31,6 @@ int main()
 	b.du.floatval = 1.5;
 
 	if(a.type==0 && b.type==0)	a.du.intval=b.du.floatval+a.du.intval;
-	if(a.type==0)	a.du.intval = 20;
 	f();
 	if(a.type==0)	return a.du.intval;
 
@@ -41,31 +40,34 @@ int main()
 void f()
 {
 	//Backup global struct before local init
-	fbtype fb1;
-	fb1.type = fb.type; fb1.du.floatval = fb.du.floatval; 
-	fb.type = 0;
-	fb.du.floatval = 10.1;
+	fytype fy1;
+	fy1.type = fy.type; fy1.du.floatval = fy.du.floatval; 
+	fy.type = 0;
+	fy.du.floatval = 10.1;
 
 	//Backup global struct before local init
-	fatype fa1;
-	fa1.type = fa.type; fa1.du.intval = fa.du.intval; 
-	fa.type = 0;
-	fa.du.intval = 35;
+	fxtype fx1;
+	fx1.type = fx.type; fx1.du.intval = fx.du.intval; 
+	fx.type = 0;
+	fx.du.intval = 35;
 
-if (b.type==-1) {printf("ERROR: VARIABLE b IS UNDEFINED AT LOC 140"); exit(1);}
-if (b.type==0 && fb.type==0 && fa.type==0)	fb.du.floatval.du.floatval = fa.du.intval + b.du.floatval;
+if (b.type==-1) {printf("ERROR: VARIABLE b IS UNDEFINED AT LOC 131"); exit(1);}
+if (b.type==0 && fy.type==0 && fx.type==0)	fy.du.floatval = fx.du.intval + b.du.floatval;
 
-if (b.type==-1) {printf("ERROR: VARIABLE b IS UNDEFINED AT LOC 154"); exit(1);}
-if (b.type==0 && fa.type==0)	fa.du.intval = fa.du.intval + b.du.floatval;
+if (b.type==-1) {printf("ERROR: VARIABLE b IS UNDEFINED AT LOC 145"); exit(1);}
+if (b.type==0 && fx.type==0)	fx.du.intval = fx.du.intval + b.du.floatval;
 
-	if(fa.type==0 && fb.type==0)	fa.du.intval = fa.du.intval + fb.du.floatval;
-
-	//Restoring from backup variables
-	fa.du.intval = fa1.du.intval; fa.type = fa1.type;
+	if(fx.type==0 && fy.type==0)	fx.du.intval = fx.du.intval + fy.du.floatval;
 
 	//Restoring from backup variables
-	fb.du.floatval = fb1.du.floatval; fb.type = fb1.type;
+	fx.du.intval = fx1.du.intval; fx.type = fx1.type;
+
+	//Restoring from backup variables
+	fy.du.floatval = fy1.du.floatval; fy.type = fy1.type;
 }
+
+/*HIGHLIGHTS
+LINE 14,15,16 addition with local and non local, local and local var*/
 '''
 
 PROG = 'rewriter'

@@ -13,3 +13,7 @@ int f1()
 	a=b+z;
 	return (a+b);
 }
+
+/*HIGHLIGHTS
+printf works
+Line 13 addition between local and non local var*/

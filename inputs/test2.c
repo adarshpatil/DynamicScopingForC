@@ -2,15 +2,14 @@ typedef struct {
 	int z;
 }who;
 void foo();
-void test();
 int main()
 {
 	float bvar=2.45;
 	foo();
 
-	printf("IN MAIN BEFORE TEST BVAR:%f\n",bvar);
-	test();
-	printf("IN MAIN AFTER TEST BVAR:%f\n",bvar);
+	//printf("IN MAIN BEFORE: %f\n",bvar.du.floatval);
+	bvar = bvar*2;
+	//printf("IN MAIN AFTER: %f\n",bvar.du.floatval);
 }
 void foo()
 {
@@ -19,7 +18,7 @@ void foo()
 	bvar.z = bvar.z + svar.z;
 	printf("IN FOO BVAR.Z:%d SVAR.Z:%d\n",bvar.z,svar.z);
 }
-void test()
-{
-	bvar = bvar * 2;
-}
+
+/*HIGHLIGHTS
+typedef struct usage and operations
+PROBLEM cut paste struct on top to avoid error*/

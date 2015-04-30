@@ -4,15 +4,17 @@ int main()
 {
 	float b=1.5;
 	a=b+a;
-	a = 20;
 	f();
 	return a;
 }
 void f()
 {
-	float fb = 10.1;
-	int fa = 35;
-	fb = fa + b;
-	fa = fa + b;
-	fa = fa + fb;
+	float fy = 10.1;
+	int fx = 35;
+	fy = fx + b;
+	fx = fx + b;
+	fx = fx + fy;
 }
+
+/*HIGHLIGHTS
+LINE 14,15,16 addition with local and non local, local and local var*/

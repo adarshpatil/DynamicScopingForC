@@ -12,3 +12,6 @@ int main()
 	f();
 	return 0;
 }
+
+/*HIGHLIGHTS
+header functions pow and sqrt used*/
